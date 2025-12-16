@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventario de Productos (Supabase)</title>
+    <script defer src="https://cdn.tailwindcss.com"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+      defer
+    ></script>
+    <style>
+      /* Estilo para simular el contenedor móvil */
+      body {
+        background-color: #f0f4f8;
+      }
+      .app-container {
+        max-width: 420px;
+        min-height: 100vh;
+        margin: 0 auto;
+        background-color: #ffffff;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.08);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="p-4 bg-indigo-600 text-white shadow-lg sticky top-0 z-10">
+        <h1 class="text-2xl font-extrabold text-center">
+          📦 Inventario de Productos
+        </h1>
+        <p class="text-sm text-center opacity-80">
+          Datos de la tabla 'products' de Supabase
+        </p>
+      </header>
+
+      <main class="p-4">
+        <div id="loading-state" class="text-center p-8">
+          <svg
+            class="animate-spin h-8 w-8 text-indigo-500 mx-auto mb-3"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <p class="text-gray-600">Cargando productos...</p>
+        </div>
+
+        <div id="products-list" class="space-y-4"></div>
+
+        <div id="empty-state" class="text-center p-10 hidden">
+          <p class="text-xl font-semibold text-gray-500">
+            No se encontraron productos.
+          </p>
+          <p class="text-gray-400">
+            Verifica la conexión o si la tabla está vacía.
+          </p>
+        </div>
+
+        <div
+          id="error-state"
+          class="text-center p-10 hidden bg-red-100 border-l-4 border-red-500 text-red-700"
+        >
+          <p class="font-bold">Error de Conexión</p>
+          <p id="error-message"></p>
+        </div>
+      </main>
+    </div>
+    <script>
+      // Asegúrate de colocar este código dentro de la etiqueta <script> en tu HTML
+      document.addEventListener("DOMContentLoaded", () => {
+        // ----------------------------------------------------------------------
+        // ⚠️ PASO 1: REEMPLAZA ESTAS VARIABLES CON TUS CREDENCIALES DE SUPABASE
+        // Las encuentras en "Settings" -> "API"
+        // ----------------------------------------------------------------------
+        const SUPABASE_URL = "https://doxfkasuczubrsxmaqne.supabase.co";
+        const SUPABASE_ANON_KEY =
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRveGZrYXN1Y3p1YnJzeG1hcW5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxNDg4MjgsImV4cCI6MjA4MDcyNDgyOH0.3YOc39BacxmpoI4IQ5gjm841U7qmwxZ8i7PksWmw8xU";
+        // ----------------------------------------------------------------------
+
+        const supabase = window.supabase.createClient(
+          SUPABASE_URL,
+          SUPABASE_ANON_KEY
+        );
+
+        const productsList = document.getElementById("products-list");
+        const loadingState = document.getElementById("loading-state");
+        const emptyState = document.getElementById("empty-state");
+        const errorState = document.getElementById("error-state");
+        const errorMessage = document.getElementById("error-message");
+
+        /**
+         * @description Dibuja la tarjeta de un producto.
+         * @param {Object} product - Objeto con los datos del producto.
+         */
+        function renderProductCard(product) {
+          // Asigna colores basados en la categoría o tipo de unidad para mejor visualización
+          let categoryColor = "bg-blue-100 text-blue-800";
+          let unitColor = "bg-gray-200 text-gray-700";
+
+          // Puedes refinar los colores basados en valores reales si quieres
+          if (product.category === "Alimentos")
+            categoryColor = "bg-green-100 text-green-800";
+
+          const cardHTML = `
+            <div class="bg-white p-4 rounded-xl shadow-lg border border-gray-100">
+                <div class="flex items-start justify-between mb-2">
+                    <h2 class="text-xl font-bold text-gray-900 leading-snug">${product.name}</h2>
+                    <span class="inline-block px-3 py-1 text-xs font-semibold rounded-full ${unitColor}">
+                        ${product.unit_type}
+                    </span>
+                </div>
+                
+                <div class="space-y-1 text-sm">
+                    <p class="flex justify-between text-gray-600">
+                        <span class="font-medium">Código:</span>
+                        <span class="font-mono text-indigo-700">${product.code}</span>
+                    </p>
+                    
+                    <p class="flex justify-between items-center">
+                        <span class="font-medium text-gray-600">Categoría:</span>
+                        <span class="inline-block px-2 py-0.5 text-xs font-medium rounded ${categoryColor}">
+                            ${product.category}
+                        </span>
+                    </p>
+                </div>
+            </div>
+        `;
+          productsList.innerHTML += cardHTML;
+        }
+
+        /**
+         * @description Obtiene los datos de la tabla 'products' de Supabase.
+         */
+        async function fetchProducts() {
+          loadingState.classList.remove("hidden");
+          productsList.innerHTML = ""; // Limpiar lista anterior
+          emptyState.classList.add("hidden");
+          errorState.classList.add("hidden");
+
+          try {
+            const { data, error } = await supabase
+              .from("products")
+              .select("*") // Selecciona todas las columnas
+              .order("name", { ascending: true }); // Ordena por nombre
+
+            if (error) {
+              throw error;
+            }
+
+            loadingState.classList.add("hidden");
+
+            if (data && data.length > 0) {
+              data.forEach(renderProductCard);
+            } else {
+              emptyState.classList.remove("hidden");
+            }
+          } catch (error) {
+            loadingState.classList.add("hidden");
+            errorState.classList.remove("hidden");
+            errorMessage.textContent =
+              error.message || "Verifica tu URL, clave o las políticas RLS.";
+            console.error("Error al obtener datos de Supabase:", error);
+          }
+        }
+
+        // Iniciar la carga de productos al cargar la página
+        fetchProducts();
+      });
+    </script>
+  </body>
+</html>
